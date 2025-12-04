@@ -1,44 +1,42 @@
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-
-import HomeScreen from "../screens/HomeScreen";
-import InsightsScreen from "../screens/InsightsScreen";
-import SettingsScreen from "../screens/SettingsScreen";
+import EditHabitScreen from "../screens/EditHabitScreen";
+import SwipeTabs from "../navigation/SwipeTabs";
 import AddHabitScreen from "../screens/AddHabitScreen";
 
-const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function TabNavigator() {
-  return (
-    <Tab.Navigator>
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Insights" component={InsightsScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
-    </Tab.Navigator>
-  );
+function MainWrapper(props) {
+  // Pass navigation manually to SwipeTabs
+  return <SwipeTabs navigation={props.navigation} />;
 }
 
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         
-        {/* Bottom Tabs */}
-        <Stack.Screen
-          name="Tabs"
-          component={TabNavigator}
-          options={{ headerShown: false }}
-        />
+        {/* Main screen */}
+        <Stack.Screen name="Main" component={MainWrapper} />
 
-        {/* Add Habit Page */}
+        {/* Add Habit screen */}
         <Stack.Screen
           name="AddHabit"
           component={AddHabitScreen}
-          options={{ title: "Add Habit" }}
+          options={{
+            headerShown: true,
+            title: "Add Habit",
+          }}
         />
-
+        <Stack.Screen
+  name="EditHabit"
+  component={EditHabitScreen}
+  options={{
+    headerShown: true,
+    title: "Edit Habit",
+  }}
+/>
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Switch, Alert, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Switch, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { HabitStorage } from '../storage/HabitStorage';
 import { NotificationService } from '../utils/NotificationService';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 const HabitSchema = Yup.object().shape({
   name: Yup.string()
@@ -21,55 +21,105 @@ const HabitSchema = Yup.object().shape({
   }),
 });
 
-export default function AddHabitScreen() {
+export default function EditHabitScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { habitId } = route.params;
+  const [habit, setHabit] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Helper to parse "HH:MM" string to Date
-  const parseTime = (timeStr) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours);
-    date.setMinutes(minutes);
-    return date;
+  useEffect(() => {
+    loadHabit();
+  }, []);
+
+  const loadHabit = async () => {
+    const habits = await HabitStorage.getHabits();
+    const found = habits.find(h => h.id === habitId);
+    if (found) {
+      setHabit(found);
+    } else {
+      Alert.alert("Error", "Habit not found");
+      navigation.goBack();
+    }
+    setLoading(false);
   };
 
   const handleSave = async (values) => {
     try {
-      const habit = await HabitStorage.saveHabit({
-        name: values.name,
-        description: values.description,
-        reminderEnabled: values.reminderEnabled,
-        reminderTime: values.reminderTime, // Store as string "HH:MM"
-      });
+      // Cancel old notification if it exists
+      if (habit.notificationId) {
+        await NotificationService.cancelNotification(habit.notificationId);
+      }
 
+      let notificationId = null;
       if (values.reminderEnabled && values.reminderTime) {
         const [hours, minutes] = values.reminderTime.split(':').map(Number);
-        const notificationId = await NotificationService.scheduleHabitReminder(
+        notificationId = await NotificationService.scheduleHabitReminder(
           habit.id,
-          `Time for ${habit.name}!`,
-          habit.description || "Keep up the streak!",
+          `Time for ${values.name}!`,
+          values.description || "Keep up the streak!",
           hours,
           minutes
         );
-        if (notificationId) {
-          await HabitStorage.updateHabit({ ...habit, notificationId });
-        }
       }
 
-      Alert.alert("Success", "Habit created successfully!");
+      await HabitStorage.updateHabit({
+        id: habitId,
+        name: values.name,
+        description: values.description,
+        reminderEnabled: values.reminderEnabled,
+        reminderTime: values.reminderTime,
+        notificationId: notificationId
+      });
+
+      Alert.alert("Success", "Habit updated successfully!");
       navigation.goBack();
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to save habit.");
+      Alert.alert("Error", "Failed to update habit.");
     }
   };
 
+  const handleDelete = async () => {
+    Alert.alert(
+      "Delete Habit",
+      "Are you sure you want to delete this habit?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete", style: "destructive", onPress: async () => {
+            try {
+              if (habit.notificationId) {
+                await NotificationService.cancelNotification(habit.notificationId);
+              }
+              await HabitStorage.deleteHabit(habitId);
+              Alert.alert("Success", "Habit deleted successfully!");
+              navigation.navigate('Main');
+            } catch (error) {
+              console.error("Error deleting habit:", error);
+              Alert.alert("Error", "Failed to delete habit.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#4A90E2" style={{ flex: 1 }} />;
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>New Habit</Text>
+      <Text style={styles.title}>Edit Habit</Text>
 
       <Formik
-        initialValues={{ name: '', description: '', reminderEnabled: false, reminderTime: '09:00' }}
+        initialValues={{
+          name: habit.name,
+          description: habit.description || '',
+          reminderEnabled: habit.reminderEnabled || false,
+          reminderTime: habit.reminderTime || '09:00'
+        }}
         validationSchema={HabitSchema}
         onSubmit={handleSave}
       >
@@ -130,7 +180,11 @@ export default function AddHabitScreen() {
             )}
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Create Habit</Text>
+              <Text style={styles.buttonText}>Save Changes</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={handleDelete}>
+              <Text style={styles.buttonText}>Delete Habit</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -184,6 +238,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 20,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
