@@ -152,9 +152,9 @@ eas build --platform android
 
 Feel free to fork, submit issues, and make pull requests!
 
-## License 📄
 
-MIT License - see LICENSE file for details.
+
+
 
 ---
 
