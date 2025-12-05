@@ -2,20 +2,42 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HabitStorage } from '../storage/HabitStorage';
+import { useAuth } from '../utils/AuthContext';
 import { BarChart, ContributionGraph } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get("window").width;
 
+const MOTIVATIONAL_QUOTES = [
+  "The only way to do great work is to love what you do. - Steve Jobs",
+  "Don't watch the clock; do what it does. Keep going. - Sam Levenson",
+  "The future depends on what you do today. - Mahatma Gandhi",
+  "It does not matter how slowly you go as long as you do not stop. - Confucius",
+  "Success is not final, failure is not fatal. - Winston Churchill",
+  "Believe you can and you're halfway there. - Theodore Roosevelt",
+  "The only impossible journey is the one you never begin. - Tony Robbins",
+  "Great things never come from comfort zones. - Unknown",
+  "Success is walking from failure to failure with no loss of enthusiasm. - Winston Churchill",
+  "You miss 100% of the shots you don't take. - Wayne Gretzky",
+  "Start where you are, use what you have, do what you can. - Arthur Ashe",
+  "The best time to plant a tree was 20 years ago. The second best time is now. - Chinese Proverb",
+  "Don't be afraid to give up the good to go for the great. - John D. Rockefeller",
+  "I am not afraid of storms, for I am learning how to sail my ship. - Louisa May Alcott",
+  "One step at a time is good walking. - Chinese Proverb",
+];
+
 export default function InsightsScreen() {
+  const { user } = useAuth();
   const [habits, setHabits] = useState([]);
   const [completionData, setCompletionData] = useState([]);
+  const [quote, setQuote] = useState(MOTIVATIONAL_QUOTES[0]);
   const [weeklyData, setWeeklyData] = useState({
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     datasets: [{ data: [0, 0, 0, 0, 0, 0, 0] }]
   });
 
   const loadData = useCallback(async () => {
-    const loadedHabits = await HabitStorage.getHabits();
+    if (!user) return;
+    const loadedHabits = await HabitStorage.getHabits(user.uid);
     setHabits(loadedHabits);
 
     // Process data for Contribution Graph (Heatmap)
@@ -64,11 +86,14 @@ export default function InsightsScreen() {
       datasets: [{ data: dataPoints }]
     });
 
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
+      // Pick a random quote when the tab is focused
+      const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+      setQuote(randomQuote);
     }, [loadData])
   );
 
@@ -82,8 +107,16 @@ export default function InsightsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      scrollEnabled={true}
+      showsVerticalScrollIndicator={true}
+    >
       <Text style={styles.title}>Insights</Text>
+
+      <View style={styles.quoteCard}>
+        <Text style={styles.quoteText}>"{quote}"</Text>
+      </View>
 
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Weekly Performance</Text>
@@ -136,12 +169,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     padding: 20,
     paddingTop: 50,
+    paddingBottom: 100,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#000',
     marginBottom: 20,
+  },
+  quoteCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4A90E2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quoteText: {
+    fontSize: 16,
+    fontStyle: 'italic',
+    color: '#333',
+    lineHeight: 24,
   },
   chartContainer: {
     backgroundColor: '#fff',
@@ -170,6 +223,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 50,
   },
   statCard: {
     backgroundColor: '#fff',

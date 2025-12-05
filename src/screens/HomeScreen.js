@@ -2,17 +2,20 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { HabitStorage } from '../storage/HabitStorage';
+import { useAuth } from '../utils/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [habits, setHabits] = useState([]);
   const [today, setToday] = useState(new Date().toISOString().split('T')[0]);
 
   const loadHabits = useCallback(async () => {
-    const loadedHabits = await HabitStorage.getHabits();
+    if (!user) return;
+    const loadedHabits = await HabitStorage.getHabits(user.uid);
     setHabits(loadedHabits);
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -24,9 +27,9 @@ export default function HomeScreen() {
   const toggleCompletion = async (habit) => {
     try {
       if (habit.completedDates.includes(today)) {
-        await HabitStorage.unmarkHabitCompleted(habit.id, today);
+        await HabitStorage.unmarkHabitCompleted(user.uid, habit.id, today);
       } else {
-        await HabitStorage.markHabitCompleted(habit.id, today);
+        await HabitStorage.markHabitCompleted(user.uid, habit.id, today);
       }
       loadHabits();
     } catch (error) {
@@ -37,6 +40,8 @@ export default function HomeScreen() {
 
   const renderItem = ({ item }) => {
     const isCompleted = item.completedDates.includes(today);
+    const categoryLabel = item.category === 'weekly' ? '📅 Weekly' : '📆 Daily';
+    
     return (
       <TouchableOpacity
         style={styles.card}
@@ -44,7 +49,10 @@ export default function HomeScreen() {
       >
         <View style={styles.cardContent}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.habitName}>{item.name}</Text>
+            <View style={styles.habitHeader}>
+              <Text style={styles.habitName}>{item.name}</Text>
+              <Text style={styles.categoryBadge}>{categoryLabel}</Text>
+            </View>
             {item.description ? <Text style={styles.habitDesc}>{item.description}</Text> : null}
             <View style={styles.streakContainer}>
               <Ionicons name="flame" size={16} color="#FF9500" />
@@ -124,11 +132,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  habitHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   habitName: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 4,
+  },
+  categoryBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    backgroundColor: '#E8F0FE',
+    color: '#4A90E2',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
   },
   habitDesc: {
     fontSize: 14,

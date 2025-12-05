@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../utils/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { NotificationService } from '../utils/NotificationService';
+import { HabitStorage } from '../storage/HabitStorage';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
+  const { user, logOut } = useAuth();
 
   const handleReset = async () => {
     Alert.alert(
@@ -18,10 +21,13 @@ export default function SettingsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await AsyncStorage.clear();
+              // Clear only user's habits, not all async storage
+              const key = `@habits_${user.uid}`;
+              const logsKey = `@habit_logs_${user.uid}`;
+              await AsyncStorage.removeItem(key);
+              await AsyncStorage.removeItem(logsKey);
               await NotificationService.cancelAll();
               Alert.alert("Success", "All data has been reset.");
-              // Ideally navigate to Home or reload app context
             } catch (e) {
               console.error(e);
               Alert.alert("Error", "Failed to reset data.");
@@ -32,9 +38,41 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleLogOut = async () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await logOut();
+            } catch (e) {
+              console.error(e);
+              Alert.alert("Error", "Failed to log out.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.userEmail}>{user?.email}</Text>
+        <TouchableOpacity style={styles.logOutButton} onPress={handleLogOut}>
+          <Text style={styles.logOutButtonText}>Log Out</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data Management</Text>
@@ -75,6 +113,22 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 15,
   },
+  userEmail: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+  },
+  logOutButton: {
+    backgroundColor: '#007bff',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  logOutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   dangerButton: {
     backgroundColor: '#FF3B30',
     padding: 15,
@@ -82,6 +136,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dangerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  exportButton: {
+    backgroundColor: '#4A90E2',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  exportButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',

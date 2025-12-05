@@ -4,6 +4,7 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { HabitStorage } from '../storage/HabitStorage';
 import { NotificationService } from '../utils/NotificationService';
+import { useAuth } from '../utils/AuthContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 const HabitSchema = Yup.object().shape({
@@ -13,6 +14,8 @@ const HabitSchema = Yup.object().shape({
     .required('Required'),
   description: Yup.string()
     .max(100, 'Too Long!'),
+  category: Yup.string()
+    .required('Select a category'),
   reminderEnabled: Yup.boolean(),
   reminderTime: Yup.string().when('reminderEnabled', {
     is: true,
@@ -24,16 +27,25 @@ const HabitSchema = Yup.object().shape({
 export default function EditHabitScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { user } = useAuth();
   const { habitId } = route.params;
   const [habit, setHabit] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Category options with default reminder times
+  const categoryOptions = {
+    daily: { label: 'Daily Habit', defaultTime: '09:00' },
+    weekly: { label: 'Weekly Habit', defaultTime: '10:00' },
+  };
+
   useEffect(() => {
-    loadHabit();
-  }, []);
+    if (user) {
+      loadHabit();
+    }
+  }, [user]);
 
   const loadHabit = async () => {
-    const habits = await HabitStorage.getHabits();
+    const habits = await HabitStorage.getHabits(user.uid);
     const found = habits.find(h => h.id === habitId);
     if (found) {
       setHabit(found);
@@ -59,16 +71,20 @@ export default function EditHabitScreen() {
           `Time for ${values.name}!`,
           values.description || "Keep up the streak!",
           hours,
-          minutes
+          minutes,
+          values.category,
+          values.reminderWeekday || null
         );
       }
 
-      await HabitStorage.updateHabit({
+      await HabitStorage.updateHabit(user.uid, {
         id: habitId,
         name: values.name,
         description: values.description,
+        category: values.category,
         reminderEnabled: values.reminderEnabled,
         reminderTime: values.reminderTime,
+        reminderWeekday: values.reminderWeekday || null,
         notificationId: notificationId
       });
 
@@ -92,7 +108,7 @@ export default function EditHabitScreen() {
               if (habit.notificationId) {
                 await NotificationService.cancelNotification(habit.notificationId);
               }
-              await HabitStorage.deleteHabit(habitId);
+              await HabitStorage.deleteHabit(user.uid, habitId);
               Alert.alert("Success", "Habit deleted successfully!");
               navigation.navigate('Main');
             } catch (error) {
@@ -117,8 +133,10 @@ export default function EditHabitScreen() {
         initialValues={{
           name: habit.name,
           description: habit.description || '',
+          category: habit.category || 'daily',
           reminderEnabled: habit.reminderEnabled || false,
-          reminderTime: habit.reminderTime || '09:00'
+          reminderTime: habit.reminderTime || '09:00',
+          reminderWeekday: habit.reminderWeekday || 2,
         }}
         validationSchema={HabitSchema}
         onSubmit={handleSave}
@@ -151,6 +169,34 @@ export default function EditHabitScreen() {
               <Text style={styles.error}>{errors.description}</Text>
             ) : null}
 
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.categoryContainer}>
+              {Object.keys(categoryOptions).map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.categoryButton,
+                    values.category === key && styles.categoryButtonActive
+                  ]}
+                  onPress={() => {
+                    setFieldValue('category', key);
+                    setFieldValue('reminderTime', categoryOptions[key].defaultTime);
+                    setFieldValue('reminderWeekday', key === 'weekly' ? 2 : null);
+                  }}
+                >
+                  <Text style={[
+                    styles.categoryButtonText,
+                    values.category === key && styles.categoryButtonTextActive
+                  ]}>
+                    {categoryOptions[key].label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {errors.category && touched.category ? (
+              <Text style={styles.error}>{errors.category}</Text>
+            ) : null}
+
             <View style={styles.switchContainer}>
               <Text style={styles.label}>Enable Reminder</Text>
               <Switch
@@ -176,6 +222,37 @@ export default function EditHabitScreen() {
                 {errors.reminderTime && touched.reminderTime ? (
                   <Text style={styles.error}>{errors.reminderTime}</Text>
                 ) : null}
+
+                {values.category === 'weekly' && (
+                  <View style={styles.dayPickerContainer}>
+                    <Text style={[styles.label, { marginBottom: 8 }]}>Choose day</Text>
+                    <View style={styles.dayRow}>
+                      {[
+                        { label: 'Sun', value: 1 },
+                        { label: 'Mon', value: 2 },
+                        { label: 'Tue', value: 3 },
+                        { label: 'Wed', value: 4 },
+                        { label: 'Thu', value: 5 },
+                        { label: 'Fri', value: 6 },
+                        { label: 'Sat', value: 7 },
+                      ].map(d => (
+                        <TouchableOpacity
+                          key={d.value}
+                          style={[styles.dayButton, values.reminderWeekday === d.value && styles.dayButtonActive]}
+                          onPress={() => setFieldValue('reminderWeekday', d.value)}
+                        >
+                          <Text style={[styles.dayText, values.reminderWeekday === d.value && styles.dayTextActive]}>{d.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <Text style={styles.helperText}>
+                  {values.category === 'daily' 
+                    ? 'You will be reminded daily at this time' 
+                    : `You will be reminded every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(values.reminderWeekday||2)-1]} at this time`}
+                </Text>
               </View>
             )}
 
@@ -231,6 +308,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     marginTop: 10,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  categoryButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  categoryButtonActive: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#E8F0FE',
+  },
+  categoryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  categoryButtonTextActive: {
+    color: '#4A90E2',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   button: {
     backgroundColor: '#4A90E2',

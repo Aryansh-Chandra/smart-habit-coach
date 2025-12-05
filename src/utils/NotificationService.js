@@ -34,7 +34,7 @@ export const NotificationService = {
     },
 
     // 3. Schedule Local Notification
-    async scheduleHabitReminder(habitId, title, body, hour, minute) {
+    async scheduleHabitReminder(habitId, title, body, hour, minute, category = 'daily', weekday = null) {
         // Check permission first
         const hasPermission = await this.requestPermissions();
         if (!hasPermission) {
@@ -44,17 +44,33 @@ export const NotificationService = {
 
         // Schedule
         try {
+            let trigger;
+            
+            if (category === 'weekly') {
+                // Schedule for specified weekday at time. weekday should be 1=Sunday .. 7=Saturday
+                const wk = weekday || 2; // default to Monday if not provided
+                trigger = {
+                    weekday: wk,
+                    hour,
+                    minute,
+                    repeats: true,
+                };
+            } else {
+                // Daily reminder
+                trigger = {
+                    hour,
+                    minute,
+                    repeats: true, // Repeat daily
+                };
+            }
+
             const identifier = await Notifications.scheduleNotificationAsync({
                 content: {
                     title,
                     body,
                     sound: true,
                 },
-                trigger: {
-                    hour,
-                    minute,
-                    repeats: true, // Repeat daily
-                },
+                trigger,
             });
             return identifier;
         } catch (e) {

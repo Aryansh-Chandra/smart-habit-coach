@@ -1,17 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const HABITS_KEY = '@habits';
-const HABIT_LOGS_KEY = '@habit_logs';
-
 // Generate a simple unique ID
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+// Get user-specific storage key
+const getHabitsKey = (userId) => `@habits_${userId}`;
+const getLogsKey = (userId) => `@habit_logs_${userId}`;
 
 export const HabitStorage = {
   // --- Habits CRUD ---
 
-  async getHabits() {
+  async getHabits(userId) {
+    if (!userId) {
+      console.warn("HabitStorage.getHabits called without userId");
+      return [];
+    }
     try {
-      const jsonValue = await AsyncStorage.getItem(HABITS_KEY);
+      const key = getHabitsKey(userId);
+      const jsonValue = await AsyncStorage.getItem(key);
       return jsonValue != null ? JSON.parse(jsonValue) : [];
     } catch (e) {
       console.error("Error reading habits", e);
@@ -19,18 +25,22 @@ export const HabitStorage = {
     }
   },
 
-  async saveHabit(habit) {
+  async saveHabit(userId, habit) {
+    if (!userId) throw new Error("userId is required");
     try {
-      const habits = await this.getHabits();
+      const habits = await this.getHabits(userId);
       const newHabit = {
         id: generateId(),
         createdAt: new Date().toISOString(),
         streak: 0,
         completedDates: [], // Array of ISO date strings (YYYY-MM-DD)
+        category: 'daily', // Default to daily
+        reminderWeekday: null, // For weekly reminders: 1=Sun .. 7=Sat
         ...habit,
       };
       const updatedHabits = [...habits, newHabit];
-      await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(updatedHabits));
+      const key = getHabitsKey(userId);
+      await AsyncStorage.setItem(key, JSON.stringify(updatedHabits));
       return newHabit;
     } catch (e) {
       console.error("Error saving habit", e);
@@ -38,13 +48,15 @@ export const HabitStorage = {
     }
   },
 
-  async updateHabit(updatedHabit) {
+  async updateHabit(userId, updatedHabit) {
+    if (!userId) throw new Error("userId is required");
     try {
-      const habits = await this.getHabits();
+      const habits = await this.getHabits(userId);
       const index = habits.findIndex(h => h.id === updatedHabit.id);
       if (index !== -1) {
         habits[index] = { ...habits[index], ...updatedHabit };
-        await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+        const key = getHabitsKey(userId);
+        await AsyncStorage.setItem(key, JSON.stringify(habits));
         return habits[index];
       }
       return null;
@@ -54,11 +66,13 @@ export const HabitStorage = {
     }
   },
 
-  async deleteHabit(habitId) {
+  async deleteHabit(userId, habitId) {
+    if (!userId) throw new Error("userId is required");
     try {
-      const habits = await this.getHabits();
+      const habits = await this.getHabits(userId);
       const updatedHabits = habits.filter(h => h.id !== habitId);
-      await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(updatedHabits));
+      const key = getHabitsKey(userId);
+      await AsyncStorage.setItem(key, JSON.stringify(updatedHabits));
     } catch (e) {
       console.error("Error deleting habit", e);
       throw e;
@@ -67,10 +81,11 @@ export const HabitStorage = {
 
   // --- Logic & Logs ---
 
-  async markHabitCompleted(habitId, dateString) {
+  async markHabitCompleted(userId, habitId, dateString) {
     // dateString should be YYYY-MM-DD
+    if (!userId) throw new Error("userId is required");
     try {
-      const habits = await this.getHabits();
+      const habits = await this.getHabits(userId);
       const index = habits.findIndex(h => h.id === habitId);
       
       if (index !== -1) {
@@ -85,11 +100,12 @@ export const HabitStorage = {
           habit.streak = this.calculateStreak(habit.completedDates);
           
           habits[index] = habit;
-          await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+          const key = getHabitsKey(userId);
+          await AsyncStorage.setItem(key, JSON.stringify(habits));
           
           // Also save to a separate log if needed for easier analytics, 
           // but keeping it in the habit object is simpler for this scale.
-          await this.logCompletion(habitId, dateString);
+          await this.logCompletion(userId, habitId, dateString);
         }
         return habit;
       }
@@ -99,9 +115,10 @@ export const HabitStorage = {
     }
   },
 
-  async unmarkHabitCompleted(habitId, dateString) {
+  async unmarkHabitCompleted(userId, habitId, dateString) {
+      if (!userId) throw new Error("userId is required");
       try {
-        const habits = await this.getHabits();
+        const habits = await this.getHabits(userId);
         const index = habits.findIndex(h => h.id === habitId);
         
         if (index !== -1) {
@@ -112,7 +129,8 @@ export const HabitStorage = {
           habit.streak = this.calculateStreak(habit.completedDates);
           
           habits[index] = habit;
-          await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+          const key = getHabitsKey(userId);
+          await AsyncStorage.setItem(key, JSON.stringify(habits));
           return habit;
         }
       } catch (e) {
@@ -172,22 +190,26 @@ export const HabitStorage = {
     return streak;
   },
 
-  async logCompletion(habitId, dateString) {
+  async logCompletion(userId, habitId, dateString) {
       // Optional: Store a flat log for easier aggregate queries later
+      if (!userId) throw new Error("userId is required");
       try {
           const logEntry = { habitId, date: dateString, timestamp: Date.now() };
-          const existingLogs = await AsyncStorage.getItem(HABIT_LOGS_KEY);
+          const key = getLogsKey(userId);
+          const existingLogs = await AsyncStorage.getItem(key);
           const logs = existingLogs ? JSON.parse(existingLogs) : [];
           logs.push(logEntry);
-          await AsyncStorage.setItem(HABIT_LOGS_KEY, JSON.stringify(logs));
+          await AsyncStorage.setItem(key, JSON.stringify(logs));
       } catch (e) {
           console.error("Error logging completion", e);
       }
   },
   
-  async getHabitLogs() {
+  async getHabitLogs(userId) {
+      if (!userId) throw new Error("userId is required");
       try {
-          const jsonValue = await AsyncStorage.getItem(HABIT_LOGS_KEY);
+          const key = getLogsKey(userId);
+          const jsonValue = await AsyncStorage.getItem(key);
           return jsonValue != null ? JSON.parse(jsonValue) : [];
       } catch (e) {
           return [];
