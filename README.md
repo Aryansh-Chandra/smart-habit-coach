@@ -1,5 +1,9 @@
 # Smart Habit Coach 🎯
 
+# Demo Video
+
+
+
 A mobile app to build and track daily habits with streaks, reminders, and insights. Built with React Native and Expo.
 
 ## Features ✨
