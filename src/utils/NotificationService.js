@@ -2,17 +2,23 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // 1. Setup the handler to show notifications when app is in foreground
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-    }),
-});
+// Only run on native platforms (not web)
+if (Platform.OS !== 'web') {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+        }),
+    });
+}
 
 export const NotificationService = {
     // 2. Request Permission ONLY
     async requestPermissions() {
+        // Notifications not supported on web
+        if (Platform.OS === 'web') return false;
+
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'default',
@@ -45,7 +51,7 @@ export const NotificationService = {
         // Schedule
         try {
             let trigger;
-            
+
             if (category === 'weekly') {
                 // Schedule for specified weekday at time. weekday should be 1=Sunday .. 7=Saturday
                 const wk = weekday || 2; // default to Monday if not provided

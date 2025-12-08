@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Switch, Alert, ScrollView } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { useHabits } from '../utils/HabitContext';
 import { HabitStorage } from '../storage/HabitStorage';
 import { NotificationService } from '../utils/NotificationService';
 import { useAuth } from '../utils/AuthContext';
@@ -27,6 +28,7 @@ const HabitSchema = Yup.object().shape({
 export default function AddHabitScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { addHabit, refreshHabits } = useHabits();
 
   // Category options with default reminder times
   const categoryOptions = {
@@ -69,6 +71,9 @@ export default function AddHabitScreen() {
           await HabitStorage.updateHabit(user.uid, { ...habit, notificationId });
         }
       }
+
+      // Refresh global state so all screens update
+      await refreshHabits();
 
       Alert.alert("Success", "Habit created successfully!");
       navigation.goBack();
@@ -195,9 +200,9 @@ export default function AddHabitScreen() {
                 )}
 
                 <Text style={styles.helperText}>
-                  {values.category === 'daily' 
-                    ? 'You will be reminded daily at this time' 
-                    : `You will be reminded every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][ (values.reminderWeekday||2) -1 ]} at this time`}
+                  {values.category === 'daily'
+                    ? 'You will be reminded daily at this time'
+                    : `You will be reminded every ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(values.reminderWeekday || 2) - 1]} at this time`}
                 </Text>
               </View>
             )}

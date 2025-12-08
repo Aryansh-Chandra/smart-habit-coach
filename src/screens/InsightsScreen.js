@@ -1,8 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { HabitStorage } from '../storage/HabitStorage';
-import { useAuth } from '../utils/AuthContext';
+import { useHabits } from '../utils/HabitContext';
 import { BarChart, ContributionGraph } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get("window").width;
@@ -26,25 +24,20 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 export default function InsightsScreen() {
-  const { user } = useAuth();
-  const [habits, setHabits] = useState([]);
-  const [completionData, setCompletionData] = useState([]);
+  const { habits } = useHabits();
   const [quote, setQuote] = useState(MOTIVATIONAL_QUOTES[0]);
-  const [weeklyData, setWeeklyData] = useState({
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    datasets: [{ data: [0, 0, 0, 0, 0, 0, 0] }]
-  });
 
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    const loadedHabits = await HabitStorage.getHabits(user.uid);
-    setHabits(loadedHabits);
+  // Pick a random quote on mount
+  useEffect(() => {
+    const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+    setQuote(randomQuote);
+  }, []);
 
-    // Process data for Contribution Graph (Heatmap)
+  // Compute completion data for heatmap - updates automatically when habits change
+  const completionData = useMemo(() => {
     const commits = [];
-    loadedHabits.forEach(habit => {
+    habits.forEach(habit => {
       habit.completedDates.forEach(date => {
-        // Check if date already exists in commits
         const existing = commits.find(c => c.date === date);
         if (existing) {
           existing.count += 1;
@@ -53,13 +46,13 @@ export default function InsightsScreen() {
         }
       });
     });
-    setCompletionData(commits);
+    return commits;
+  }, [habits]);
 
-    // Process data for Weekly Bar Chart
-    // Get last 7 days
+  // Compute weekly bar chart data - updates automatically when habits change
+  const weeklyData = useMemo(() => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const today = new Date();
-    const last7Days = [];
     const dataPoints = [];
     const labels = [];
 
@@ -71,9 +64,8 @@ export default function InsightsScreen() {
 
       labels.push(dayName);
 
-      // Count completions for this day
       let count = 0;
-      loadedHabits.forEach(habit => {
+      habits.forEach(habit => {
         if (habit.completedDates.includes(dateStr)) {
           count++;
         }
@@ -81,21 +73,11 @@ export default function InsightsScreen() {
       dataPoints.push(count);
     }
 
-    setWeeklyData({
+    return {
       labels: labels,
-      datasets: [{ data: dataPoints }]
-    });
-
-  }, [user]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-      // Pick a random quote when the tab is focused
-      const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
-      setQuote(randomQuote);
-    }, [loadData])
-  );
+      datasets: [{ data: dataPoints.length > 0 ? dataPoints : [0] }]
+    };
+  }, [habits]);
 
   const chartConfig = {
     backgroundGradientFrom: "#ffffff",
@@ -107,7 +89,7 @@ export default function InsightsScreen() {
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       scrollEnabled={true}
       showsVerticalScrollIndicator={true}

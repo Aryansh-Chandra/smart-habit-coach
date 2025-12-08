@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Switch, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { useHabits } from '../utils/HabitContext';
 import { HabitStorage } from '../storage/HabitStorage';
 import { NotificationService } from '../utils/NotificationService';
 import { useAuth } from '../utils/AuthContext';
@@ -28,6 +29,7 @@ export default function EditHabitScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
+  const { refreshHabits } = useHabits();
   const { habitId } = route.params;
   const [habit, setHabit] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,6 +90,9 @@ export default function EditHabitScreen() {
         notificationId: notificationId
       });
 
+      // Refresh global state so all screens update
+      await refreshHabits();
+
       Alert.alert("Success", "Habit updated successfully!");
       navigation.goBack();
     } catch (error) {
@@ -109,6 +114,10 @@ export default function EditHabitScreen() {
                 await NotificationService.cancelNotification(habit.notificationId);
               }
               await HabitStorage.deleteHabit(user.uid, habitId);
+
+              // Refresh global state so all screens update
+              await refreshHabits();
+
               Alert.alert("Success", "Habit deleted successfully!");
               navigation.navigate('Main');
             } catch (error) {
@@ -249,9 +258,9 @@ export default function EditHabitScreen() {
                 )}
 
                 <Text style={styles.helperText}>
-                  {values.category === 'daily' 
-                    ? 'You will be reminded daily at this time' 
-                    : `You will be reminded every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(values.reminderWeekday||2)-1]} at this time`}
+                  {values.category === 'daily'
+                    ? 'You will be reminded daily at this time'
+                    : `You will be reminded every ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(values.reminderWeekday || 2) - 1]} at this time`}
                 </Text>
               </View>
             )}

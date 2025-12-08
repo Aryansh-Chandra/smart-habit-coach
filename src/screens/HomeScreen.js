@@ -1,37 +1,21 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { HabitStorage } from '../storage/HabitStorage';
-import { useAuth } from '../utils/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { useHabits } from '../utils/HabitContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const { user } = useAuth();
-  const [habits, setHabits] = useState([]);
-  const [today, setToday] = useState(new Date().toISOString().split('T')[0]);
-
-  const loadHabits = useCallback(async () => {
-    if (!user) return;
-    const loadedHabits = await HabitStorage.getHabits(user.uid);
-    setHabits(loadedHabits);
-  }, [user]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadHabits();
-      setToday(new Date().toISOString().split('T')[0]);
-    }, [loadHabits])
-  );
+  const { habits, markHabitCompleted, unmarkHabitCompleted } = useHabits();
+  const [today] = useState(new Date().toISOString().split('T')[0]);
 
   const toggleCompletion = async (habit) => {
     try {
       if (habit.completedDates.includes(today)) {
-        await HabitStorage.unmarkHabitCompleted(user.uid, habit.id, today);
+        await unmarkHabitCompleted(habit.id, today);
       } else {
-        await HabitStorage.markHabitCompleted(user.uid, habit.id, today);
+        await markHabitCompleted(habit.id, today);
       }
-      loadHabits();
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Failed to update habit status.");
@@ -41,7 +25,7 @@ export default function HomeScreen() {
   const renderItem = ({ item }) => {
     const isCompleted = item.completedDates.includes(today);
     const categoryLabel = item.category === 'weekly' ? '📅 Weekly' : '📆 Daily';
-    
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -55,8 +39,14 @@ export default function HomeScreen() {
             </View>
             {item.description ? <Text style={styles.habitDesc}>{item.description}</Text> : null}
             <View style={styles.streakContainer}>
-              <Ionicons name="flame" size={16} color="#FF9500" />
-              <Text style={styles.streakText}>{item.streak} day streak</Text>
+              <Ionicons
+                name={item.streak > 0 ? "flame" : "thumbs-down"}
+                size={16}
+                color={item.streak > 0 ? "#FF9500" : "#8E8E93"}
+              />
+              <Text style={[styles.streakText, item.streak === 0 && { color: '#8E8E93' }]}>
+                {item.streak} day streak
+              </Text>
             </View>
           </View>
 

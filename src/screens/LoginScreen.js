@@ -39,8 +39,8 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleDownloadApp = () => {
-    // This assumes the APK is hosted at the root of the site
-    Linking.openURL('/application-debug.apk');
+    // APK hosted on GitHub Releases
+    Linking.openURL('https://github.com/Aryansh-Chandra/smart-habit-coach/releases/download/v1.0.0/application-c0172358-9492-4db1-bad2-d4fa04ef47a6.apk');
   };
 
   return (
