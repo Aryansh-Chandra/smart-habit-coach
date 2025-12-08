@@ -1,7 +1,7 @@
 # Smart Habit Coach 🎯
 
 # Demo Video
-
+https://github.com/Aryansh-Chandra/smart-habit-coach/releases/tag/v2
 
 
 A mobile app to build and track daily habits with streaks, reminders, and insights. Built with React Native and Expo.
